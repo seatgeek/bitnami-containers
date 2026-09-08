@@ -48,6 +48,17 @@ RUN --mount=type=secret,id=downloads_url,env=SECRET_DOWNLOADS_URL \
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y inotify-tools && \
     apt-get clean && rm -rf /var/lib/apt/lists /var/cache/apt/archives
+RUN mkdir -p /opt/bitnami/process-compose/bin && \
+    PC_VERSION="1.122.0" && \
+    curl -SsLf "https://github.com/F1bonacc1/process-compose/releases/download/v${PC_VERSION}/process-compose_linux_${OS_ARCH}.tar.gz" -o /tmp/process-compose.tar.gz && \
+    if [ "$OS_ARCH" = "amd64" ]; then \
+      echo "9b6dbc38324c0b0481f1cd1dd828ffdc78117129ec797678f4bf8c4023311281  /tmp/process-compose.tar.gz" | sha256sum -c - ; \
+    else \
+      echo "52fa7d5a2d5e0db470faec5976204fc215ed7e3d13689e930cf522becfb63778  /tmp/process-compose.tar.gz" | sha256sum -c - ; \
+    fi && \
+    tar -zxf /tmp/process-compose.tar.gz -C /opt/bitnami/process-compose/bin process-compose && \
+    rm /tmp/process-compose.tar.gz && \
+    chmod +x /opt/bitnami/process-compose/bin/process-compose
 RUN chmod g+rwX /opt/bitnami
 RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true
 RUN update-locale LANG=C.UTF-8 LC_MESSAGES=POSIX && \
@@ -66,7 +77,7 @@ ENV APP_VERSION="1.25.2" \
     LANGUAGE="en_US:en" \
     LD_LIBRARY_PATH="/opt/bitnami/postgresql/lib" \
     NSS_WRAPPER_LIB="/opt/bitnami/common/lib/libnss_wrapper.so" \
-    PATH="/opt/bitnami/python/bin:/opt/bitnami/aws-cli/bin:/opt/bitnami/aws-cli/venv/bin:/opt/bitnami/common/bin:/opt/bitnami/postgresql/bin:/opt/bitnami/pgbouncer/bin:$PATH"
+    PATH="/opt/bitnami/process-compose/bin:/opt/bitnami/python/bin:/opt/bitnami/aws-cli/bin:/opt/bitnami/aws-cli/venv/bin:/opt/bitnami/common/bin:/opt/bitnami/postgresql/bin:/opt/bitnami/pgbouncer/bin:$PATH"
 
 EXPOSE 6432
 
