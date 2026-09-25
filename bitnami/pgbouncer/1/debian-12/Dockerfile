@@ -81,5 +81,4 @@ ENV APP_VERSION="1.26.0" \
 EXPOSE 6432
 
 USER 1001
-ENTRYPOINT [ "/opt/bitnami/scripts/pgbouncer/entrypoint.sh" ]
-CMD [ "/opt/bitnami/scripts/pgbouncer/run.sh" ]
+ENTRYPOINT [ "/opt/seatgeek/pgbouncer/entrypoint.sh" ]
