@@ -71,7 +71,7 @@ RUN /opt/bitnami/scripts/pgbouncer/postunpack.sh
 ENV APP_VERSION="1.26.0" \
     AWS_CA_BUNDLE="/etc/ssl/certs/ca-certificates.crt" \
     BITNAMI_APP_NAME="pgbouncer" \
-    IMAGE_REVISION="0" \
+    IMAGE_REVISION="1" \
     LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
     LD_LIBRARY_PATH="/opt/bitnami/postgresql/lib" \
