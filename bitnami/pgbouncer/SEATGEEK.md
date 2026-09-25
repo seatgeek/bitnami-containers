@@ -27,8 +27,8 @@ trust` line in the HBA file).
 
 ## Image tags
 
-Images are published as `<version>-sg<SEATGEEK_REVISION>-r<IMAGE_REVISION>`, e.g.
-`1.26.0-sg0-r0`. `IMAGE_REVISION` in the Dockerfile tracks upstream Bitnami releases;
+Images are published as `<version>-r<IMAGE_REVISION>-sg<SEATGEEK_REVISION>`, e.g.
+`1.26.0-r0-sg0`. `IMAGE_REVISION` in the Dockerfile tracks upstream Bitnami releases;
 `SEATGEEK_REVISION` (next to the Dockerfile) tracks our changes. Bump `SEATGEEK_REVISION` with
 every SeatGeek change and never reset it, so each tag always maps to one image.
 
