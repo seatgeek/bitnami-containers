@@ -1,0 +1,59 @@
+version: "0.5"
+
+is_tui_disabled: true
+
+# Do not set log_level here: validateLogLevel applies it to zerolog globally,
+# which also suppresses PCLog.Info and would drop JSON process logs when commands
+# merge stderr into stdout (2>&1). Internal INF chatter is discarded via
+# --log-file /dev/null in the entrypoint instead.
+
+log_location: ${PGBOUNCER_LOG_FIFO}
+
+log_configuration:
+  disable_json: false
+  add_timestamp: true
+  no_color: true
+  flush_each_line: true
+  fields_order: ["time", "level", "message"]
+
+processes:
+  setup:
+    description: Build the initial PgBouncer config
+    command: /opt/seatgeek/pgbouncer/setup.sh 2>&1
+    availability:
+      restart: "no"
+
+  pgbouncer:
+    description: PgBouncer connection pooler
+    command: /opt/bitnami/scripts/pgbouncer/run.sh 2>&1
+    depends_on:
+      setup:
+        condition: process_completed_successfully
+    availability:
+      exit_on_end: true
+
+  config-reload:
+    description: Rebuild config and RELOAD when PGBOUNCER_WATCH_DIR changes
+    command: /opt/seatgeek/pgbouncer/reload.sh 2>&1
+    environment:
+      - SKIP_INITIAL=1
+    depends_on:
+      pgbouncer:
+        condition: process_started
+    availability:
+      restart: "no"
+    watch:
+      debounce: 500ms
+      paths:
+        - path: ${PGBOUNCER_WATCH_DIR}
+
+  iam-refresh:
+    description: Rebuild config and RELOAD before IAM tokens expire
+    command: /opt/seatgeek/pgbouncer/reload.sh 2>&1
+    depends_on:
+      pgbouncer:
+        condition: process_started
+    schedule:
+      interval: ${PGBOUNCER_IAM_REFRESH_SECONDS}s
+    availability:
+      restart: "no"
