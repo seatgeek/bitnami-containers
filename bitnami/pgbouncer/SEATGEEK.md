@@ -27,10 +27,10 @@ trust` line in the HBA file).
 
 ## Image tags
 
-Images are published as `<version>-debian-12-r<IMAGE_REVISION>-sg<SEATGEEK_REVISION>`, e.g.
-`1.26.0-debian-12-r0-sg0`. `IMAGE_REVISION` in the Dockerfile tracks upstream Bitnami releases;
-`SEATGEEK_REVISION` (next to the Dockerfile) tracks our changes. Bump `SEATGEEK_REVISION` with
-every SeatGeek change and never reset it, so each tag always maps to one image.
+Images are published as `<version>-sg<SEATGEEK_REVISION>`, e.g. `1.26.0-sg0`, where
+`SEATGEEK_REVISION` lives next to the Dockerfile. Bump it with every change that alters the
+image, including syncs of a new upstream Bitnami `IMAGE_REVISION`, and never reset it, so each
+tag always maps to one image.
 
 ## Environment variables
 
