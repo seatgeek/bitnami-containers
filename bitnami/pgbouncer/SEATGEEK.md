@@ -1,11 +1,12 @@
 # SeatGeek additions to the PgBouncer image
 
 This fork adds the AWS CLI, Python, process-compose, and a supervisor under
-`/opt/seatgeek/pgbouncer` to the Bitnami image. The Bitnami entrypoint is unchanged, so
-the image behaves exactly like upstream unless you opt into the supervisor:
+`/opt/seatgeek/pgbouncer` to the Bitnami image. The supervisor is the image's entrypoint, so
+no `command` is needed. Any arguments are executed in its place (e.g. `docker run <image>
+bash`), and the upstream behavior is still available by overriding the entrypoint:
 
 ```yaml
-command: ["/opt/seatgeek/pgbouncer/entrypoint.sh"]
+command: ["/opt/bitnami/scripts/pgbouncer/entrypoint.sh", "/opt/bitnami/scripts/pgbouncer/run.sh"]
 ```
 
 The supervisor runs PgBouncer under [process-compose](https://f1bonacc1.github.io/process-compose/launcher/)

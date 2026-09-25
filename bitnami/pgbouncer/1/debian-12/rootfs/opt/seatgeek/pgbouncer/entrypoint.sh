@@ -9,6 +9,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Any arguments replace the supervisor, e.g. `docker run <image> bash` for debugging.
+if [[ $# -gt 0 ]]; then
+  exec "$@"
+fi
+
 . /opt/seatgeek/pgbouncer/lib.sh
 
 pgbouncer_supervisor_env
