@@ -25,6 +25,13 @@ issued over the unix socket in `PGBOUNCER_SOCKET_DIR` as `POSTGRESQL_USERNAME`, 
 writes into `admin_users`, so the socket must accept that user (for example a `local all all
 trust` line in the HBA file).
 
+## Image tags
+
+Images are published as `<version>-debian-12-r<IMAGE_REVISION>-sg<SEATGEEK_REVISION>`, e.g.
+`1.26.0-debian-12-r0-sg0`. `IMAGE_REVISION` in the Dockerfile tracks upstream Bitnami releases;
+`SEATGEEK_REVISION` (next to the Dockerfile) tracks our changes. Bump `SEATGEEK_REVISION` with
+every SeatGeek change and never reset it, so each tag always maps to one image.
+
 ## Environment variables
 
 All Bitnami variables still apply. The supervisor adds:

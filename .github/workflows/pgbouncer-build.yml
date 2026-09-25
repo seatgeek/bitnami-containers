@@ -35,9 +35,11 @@ jobs:
         run: |
           version="$(grep 'APP_VERSION=' "${DOCKERFILE_PATH}/Dockerfile" | head -1 | cut -d'"' -f2)"
           revision="$(grep 'IMAGE_REVISION=' "${DOCKERFILE_PATH}/Dockerfile" | head -1 | cut -d'"' -f2)"
-          tag="${version}-debian-12-r${revision}"
+          sg_revision="$(tr -d '[:space:]' < "${DOCKERFILE_PATH}/SEATGEEK_REVISION")"
+          tag="${version}-debian-12-r${revision}-sg${sg_revision}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "revision=${revision}" >> "${GITHUB_OUTPUT}"
+          echo "sg_revision=${sg_revision}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
 
       - name: Log in to GitHub Container Registry
