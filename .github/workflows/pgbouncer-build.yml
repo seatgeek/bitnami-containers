@@ -34,8 +34,9 @@ jobs:
         id: meta
         run: |
           version="$(grep 'APP_VERSION=' "${DOCKERFILE_PATH}/Dockerfile" | head -1 | cut -d'"' -f2)"
+          revision="$(grep 'IMAGE_REVISION=' "${DOCKERFILE_PATH}/Dockerfile" | head -1 | cut -d'"' -f2)"
           sg_revision="$(tr -d '[:space:]' < "${DOCKERFILE_PATH}/SEATGEEK_REVISION")"
-          tag="${version}-sg${sg_revision}"
+          tag="${version}-sg${sg_revision}-r${revision}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
 
