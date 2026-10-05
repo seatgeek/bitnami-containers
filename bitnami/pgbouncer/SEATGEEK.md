@@ -17,7 +17,7 @@ together with the processes that keep its config current:
 | `setup`         | Builds the initial config with Bitnami's `setup.sh`, then appends RDS IAM tokens               |
 | `pgbouncer`     | Bitnami's `run.sh`; the container exits when it does                                            |
 | `config-reload` | Rebuilds the config and issues `RELOAD` whenever `PGBOUNCER_WATCH_DIR` changes                  |
-| `iam-refresh`   | Does the same every `PGBOUNCER_IAM_REFRESH_SECONDS`, well before IAM tokens expire (15 minutes) |
+| `iam-refresh`   | Rebuilds and `RELOAD`s every `PGBOUNCER_IAM_REFRESH_SECONDS` when any DSN uses IAM; no-ops otherwise |
 
 Both reload processes call the same script, which serializes overlapping runs with `flock`,
 because process-compose cannot combine `watch` and `schedule` on one process. `RELOAD` is
@@ -40,7 +40,7 @@ All Bitnami variables still apply. The supervisor adds:
 |---------------------------------|-----------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `PGBOUNCER_ENV_FILE`            |                                                           | Shell file sourced before every config build, e.g. a rendered file exporting `PGBOUNCER_DSN_*`     |
 | `PGBOUNCER_WATCH_DIR`           | directory of `PGBOUNCER_ENV_FILE`, else of `PGBOUNCER_USERLIST_FILE`, else `/bitnami/pgbouncer/conf` | Directory whose changes trigger a rebuild and `RELOAD`                  |
-| `PGBOUNCER_IAM_REFRESH_SECONDS` | `600`                                                     | Interval of the scheduled rebuild; it runs whether or not any DSN uses IAM                          |
+| `PGBOUNCER_IAM_REFRESH_SECONDS` | `600`                                                     | Interval of the scheduled IAM rebuild; skipped (exit 0, no rebuild/`RELOAD`) when no DSN uses IAM   |
 | `PGBOUNCER_IAM_USER_PREFIX`     | `iam-user-`                                               | DSN users with this prefix get an RDS IAM token instead of a static password                        |
 | `PGBOUNCER_WAIT_FOR_BACKEND`    | `yes`                                                     | Set to `no` to skip Bitnami's wait for `POSTGRESQL_HOST`, e.g. when that host is PgBouncer itself   |
 
