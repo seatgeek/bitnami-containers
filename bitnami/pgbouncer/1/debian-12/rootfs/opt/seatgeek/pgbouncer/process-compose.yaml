@@ -50,6 +50,8 @@ processes:
   iam-refresh:
     description: Rebuild config and RELOAD before IAM tokens expire
     command: /opt/seatgeek/pgbouncer/reload.sh 2>&1
+    environment:
+      - IAM_REFRESH_ONLY=1
     depends_on:
       pgbouncer:
         condition: process_started
