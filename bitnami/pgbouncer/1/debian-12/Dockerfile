@@ -1,6 +1,20 @@
 # Copyright Broadcom, Inc. All Rights Reserved.
 # SPDX-License-Identifier: APACHE-2.0
 
+# Build process-compose from source: the update check is compiled in (CheckForUpdates)
+# and makes an outbound call to api.github.com at startup. Setting Version is required,
+# otherwise config.go re-enables CheckForUpdates when Version is "undefined".
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.26 AS process-compose
+ARG TARGETARCH
+ARG PC_VERSION=1.122.0
+RUN git clone --depth 1 --branch "v${PC_VERSION}" https://github.com/F1bonacc1/process-compose /src
+WORKDIR /src
+RUN CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH}" go build -o /process-compose \
+      -ldflags "-s -w \
+        -X github.com/f1bonacc1/process-compose/src/config.Version=v${PC_VERSION} \
+        -X github.com/f1bonacc1/process-compose/src/config.CheckForUpdates=false" \
+      .
+
 FROM docker.io/bitnami/minideb:bookworm
 
 ARG DOWNLOADS_URL="https://downloads.bitnami.com/files/stacksmith"
@@ -47,17 +61,7 @@ RUN --mount=type=secret,id=downloads_url,env=SECRET_DOWNLOADS_URL \
     rm -rf /opt/bitnami/checksums ;
 RUN apt-get update && apt-get upgrade -y && \
     apt-get clean && rm -rf /var/lib/apt/lists /var/cache/apt/archives
-RUN mkdir -p /opt/bitnami/process-compose/bin && \
-    PC_VERSION="1.122.0" && \
-    curl -SsLf "https://github.com/F1bonacc1/process-compose/releases/download/v${PC_VERSION}/process-compose_linux_${OS_ARCH}.tar.gz" -o /tmp/process-compose.tar.gz && \
-    if [ "$OS_ARCH" = "amd64" ]; then \
-      echo "9b6dbc38324c0b0481f1cd1dd828ffdc78117129ec797678f4bf8c4023311281  /tmp/process-compose.tar.gz" | sha256sum -c - ; \
-    else \
-      echo "52fa7d5a2d5e0db470faec5976204fc215ed7e3d13689e930cf522becfb63778  /tmp/process-compose.tar.gz" | sha256sum -c - ; \
-    fi && \
-    tar -zxf /tmp/process-compose.tar.gz -C /opt/bitnami/process-compose/bin process-compose && \
-    rm /tmp/process-compose.tar.gz && \
-    chmod +x /opt/bitnami/process-compose/bin/process-compose
+COPY --from=process-compose /process-compose /opt/bitnami/process-compose/bin/process-compose
 RUN chmod g+rwX /opt/bitnami
 RUN find / -perm /6000 -type f -exec chmod a-s {} \; || true
 RUN update-locale LANG=C.UTF-8 LC_MESSAGES=POSIX && \
