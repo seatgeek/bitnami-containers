@@ -154,28 +154,11 @@ iam_userlist_line() {
 }
 
 # Reads "user host port" lines and emits a userlist line per target. Each aws call
-# takes ~1s, so targets are minted concurrently and emitted in input order.
+# takes ~1s, so xargs mints them all concurrently (-P0); userlist order is irrelevant
+# and xargs exits non-zero if any mint fails.
 iam_userlist_lines() {
-  local user host port tmp n=0 pid failed=0
-  local pids=()
-
-  tmp=$(mktemp -d)
-
-  while read -r user host port; do
-    iam_userlist_line "$user" "$host" "$port" >"${tmp}/${n}" &
-    pids+=("$!")
-    n=$((n + 1))
-  done
-
-  for pid in "${pids[@]}"; do
-    wait "$pid" || failed=1
-  done
-
-  if [ "$failed" -eq 0 ]; then
-    for ((pid = 0; pid < n; pid++)); do cat "${tmp}/${pid}"; done
-  fi
-  rm -rf "$tmp"
-  return "$failed"
+  export -f rds_host_region iam_userlist_line
+  xargs -P0 -n3 bash -c 'iam_userlist_line "$@"' _
 }
 
 # RELOAD makes PgBouncer re-read pgbouncer.ini and userlist.txt without dropping
