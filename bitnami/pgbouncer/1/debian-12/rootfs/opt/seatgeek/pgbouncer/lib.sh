@@ -117,43 +117,65 @@ iam_dsn_targets() {
   done
 }
 
-# Reads "user host port" lines and emits a userlist line per target.
-iam_userlist_lines() {
-  local user host port region token
+# Mints one token and prints its userlist line. Args: user host port.
+iam_userlist_line() {
+  local user="$1" host="$2" port="$3" region token
   local region_args=()
 
+  region=$(rds_host_region "$host")
+  if [ -n "$region" ]; then
+    region_args=(--region "$region")
+  fi
+
+  # errexit does not fire on a failed command substitution, so both the exit
+  # status and the token have to be checked to avoid writing an empty password
+  if ! token=$(aws rds generate-db-auth-token \
+    --hostname "$host" --port "$port" --username "$user" \
+    "${region_args[@]}"); then
+    echo "failed to generate an IAM token for ${user}@${host}:${port}" >&2
+    return 1
+  fi
+
+  if [ -z "$token" ]; then
+    echo "generated an empty IAM token for ${user}@${host}:${port}" >&2
+    return 1
+  fi
+
+  echo "minted IAM token for ${user}@${host}:${port} (${#token} bytes)" >&2
+
+  # PgBouncer silently truncates at MAX_PASSWORD, which would leave a
+  # corrupt token in the userlist instead of failing outright
+  if [ "${#token}" -ge 2048 ]; then
+    echo "IAM token for ${user}@${host} is ${#token} bytes, over PgBouncer's 2048 byte password limit" >&2
+    return 1
+  fi
+
+  printf '"%s" "%s"\n' "$user" "$token"
+}
+
+# Reads "user host port" lines and emits a userlist line per target. Each aws call
+# takes ~1s, so targets are minted concurrently and emitted in input order.
+iam_userlist_lines() {
+  local user host port tmp n=0 pid failed=0
+  local pids=()
+
+  tmp=$(mktemp -d)
+
   while read -r user host port; do
-    region=$(rds_host_region "$host")
-    region_args=()
-    if [ -n "$region" ]; then
-      region_args=(--region "$region")
-    fi
-
-    # errexit does not fire on a failed command substitution, so both the exit
-    # status and the token have to be checked to avoid writing an empty password
-    if ! token=$(aws rds generate-db-auth-token \
-      --hostname "$host" --port "$port" --username "$user" \
-      "${region_args[@]}"); then
-      echo "failed to generate an IAM token for ${user}@${host}:${port}" >&2
-      return 1
-    fi
-
-    if [ -z "$token" ]; then
-      echo "generated an empty IAM token for ${user}@${host}:${port}" >&2
-      return 1
-    fi
-
-    echo "minted IAM token for ${user}@${host}:${port} (${#token} bytes)" >&2
-
-    # PgBouncer silently truncates at MAX_PASSWORD, which would leave a
-    # corrupt token in the userlist instead of failing outright
-    if [ "${#token}" -ge 2048 ]; then
-      echo "IAM token for ${user}@${host} is ${#token} bytes, over PgBouncer's 2048 byte password limit" >&2
-      return 1
-    fi
-
-    printf '"%s" "%s"\n' "$user" "$token"
+    iam_userlist_line "$user" "$host" "$port" >"${tmp}/${n}" &
+    pids+=("$!")
+    n=$((n + 1))
   done
+
+  for pid in "${pids[@]}"; do
+    wait "$pid" || failed=1
+  done
+
+  if [ "$failed" -eq 0 ]; then
+    for ((pid = 0; pid < n; pid++)); do cat "${tmp}/${pid}"; done
+  fi
+  rm -rf "$tmp"
+  return "$failed"
 }
 
 # RELOAD makes PgBouncer re-read pgbouncer.ini and userlist.txt without dropping
