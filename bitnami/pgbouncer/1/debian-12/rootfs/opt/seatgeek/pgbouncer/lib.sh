@@ -104,13 +104,6 @@ iam_dsn_targets() {
   done
 }
 
-# Reads "user host port" lines and emits a userlist line per target. One Python
-# process mints them all, so memory stays flat as the number of databases grows
-# (one `aws` process per DSN cost ~85 MiB RSS each at startup). Exits non-zero if any mint fails.
-iam_userlist_lines() {
-  "${PGBOUNCER_SUPERVISOR_DIR}/iam-tokens.py"
-}
-
 # RELOAD makes PgBouncer re-read pgbouncer.ini and userlist.txt without dropping
 # transactions. POSTGRESQL_USERNAME is what Bitnami writes into admin_users.
 reload_pgbouncer() {
@@ -148,7 +141,9 @@ apply_pgbouncer_config() {
   # Mint before setup.sh, which deletes userlist.txt up front: a failed AWS call
   # after that point would leave PgBouncer with no IAM credentials at all.
   if [ -n "$targets" ]; then
-    iam_lines=$(iam_userlist_lines <<<"$targets") || return 1
+    # One Python process mints every token, so memory stays flat as DSNs are added
+    # (an `aws` process per DSN cost ~85 MiB RSS each). Exits non-zero if any mint fails.
+    iam_lines=$("${PGBOUNCER_SUPERVISOR_DIR}/iam-tokens.py" <<<"$targets") || return 1
   fi
 
   /opt/bitnami/scripts/pgbouncer/setup.sh
