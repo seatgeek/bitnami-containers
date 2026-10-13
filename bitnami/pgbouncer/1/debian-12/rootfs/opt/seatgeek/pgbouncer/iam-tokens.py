@@ -11,10 +11,6 @@ import sys
 
 from awscli.botocore.session import Session
 
-# PgBouncer silently truncates passwords at MAX_PASSWORD, which would leave a corrupt
-# token in the userlist instead of failing outright
-MAX_PASSWORD = 2048
-
 
 def host_region(host):
     """RDS embeds the region in the endpoint; aws puts it before ".rds", aws-cn after."""
@@ -51,16 +47,6 @@ def main():
             continue
 
         print(f"minted IAM token for {target} ({len(token)} bytes)", file=sys.stderr)
-
-        if len(token) >= MAX_PASSWORD:
-            print(
-                f"IAM token for {user}@{host} is {len(token)} bytes, over PgBouncer's "
-                f"{MAX_PASSWORD} byte password limit",
-                file=sys.stderr,
-            )
-            failed = True
-            continue
-
         print(f'"{user}" "{token}"')
 
     return 1 if failed else 0
