@@ -72,19 +72,6 @@ pgbouncer_source_env_file() {
   fi
 }
 
-# RDS embeds the region in the endpoint, but the segment order differs between
-# partitions: aws puts it before ".rds", aws-cn after it. Stripping the known
-# suffixes leaves the region as the final segment either way.
-rds_host_region() {
-  local rest="${1%.cn}"
-  rest="${rest%.amazonaws.com}"
-  rest="${rest%.rds}"
-
-  case "${rest##*.}" in
-    [a-z][a-z]-*-[0-9]) echo "${rest##*.}" ;;
-  esac
-}
-
 # A DSN opts into IAM auth by convention rather than configuration: a user carrying
 # PGBOUNCER_IAM_USER_PREFIX pointing at an RDS endpoint. Emits "user host port" per
 # match, so callers can test for an empty result to detect "no IAM here".
@@ -115,50 +102,6 @@ iam_dsn_targets() {
         ;;
     esac
   done
-}
-
-# Mints one token and prints its userlist line. Args: user host port.
-iam_userlist_line() {
-  local user="$1" host="$2" port="$3" region token
-  local region_args=()
-
-  region=$(rds_host_region "$host")
-  if [ -n "$region" ]; then
-    region_args=(--region "$region")
-  fi
-
-  # errexit does not fire on a failed command substitution, so both the exit
-  # status and the token have to be checked to avoid writing an empty password
-  if ! token=$(aws rds generate-db-auth-token \
-    --hostname "$host" --port "$port" --username "$user" \
-    "${region_args[@]}"); then
-    echo "failed to generate an IAM token for ${user}@${host}:${port}" >&2
-    return 1
-  fi
-
-  if [ -z "$token" ]; then
-    echo "generated an empty IAM token for ${user}@${host}:${port}" >&2
-    return 1
-  fi
-
-  echo "minted IAM token for ${user}@${host}:${port} (${#token} bytes)" >&2
-
-  # PgBouncer silently truncates at MAX_PASSWORD, which would leave a
-  # corrupt token in the userlist instead of failing outright
-  if [ "${#token}" -ge 2048 ]; then
-    echo "IAM token for ${user}@${host} is ${#token} bytes, over PgBouncer's 2048 byte password limit" >&2
-    return 1
-  fi
-
-  printf '"%s" "%s"\n' "$user" "$token"
-}
-
-# Reads "user host port" lines and emits a userlist line per target. Each aws call
-# takes ~1s, so xargs mints them all concurrently (-P0); userlist order is irrelevant
-# and xargs exits non-zero if any mint fails.
-iam_userlist_lines() {
-  export -f rds_host_region iam_userlist_line
-  xargs -P0 -n3 bash -c 'iam_userlist_line "$@"' _
 }
 
 # RELOAD makes PgBouncer re-read pgbouncer.ini and userlist.txt without dropping
@@ -198,7 +141,9 @@ apply_pgbouncer_config() {
   # Mint before setup.sh, which deletes userlist.txt up front: a failed AWS call
   # after that point would leave PgBouncer with no IAM credentials at all.
   if [ -n "$targets" ]; then
-    iam_lines=$(iam_userlist_lines <<<"$targets") || return 1
+    # One Python process mints every token, so memory stays flat as DSNs are added
+    # (an `aws` process per DSN cost ~85 MiB RSS each). Exits non-zero if any mint fails.
+    iam_lines=$("${PGBOUNCER_SUPERVISOR_DIR}/iam-tokens.py" <<<"$targets") || return 1
   fi
 
   /opt/bitnami/scripts/pgbouncer/setup.sh
