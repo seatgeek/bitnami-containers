@@ -56,9 +56,11 @@ an RDS endpoint (`*.rds.amazonaws.com` or `*.rds.*.amazonaws.com.cn`).
 export PGBOUNCER_DSN_0="api=host=db-api.abc123.us-east-1.rds.amazonaws.com port=5432 user=iam-user-api dbname=api"
 ```
 
-On each build the supervisor mints a token per matching DSN with `aws rds generate-db-auth-token`
-(region taken from the endpoint), before `setup.sh` deletes the old userlist, and appends it to
-`userlist.txt`. Prefixed lines from the static userlist are dropped so they cannot shadow a fresh
+On each build the supervisor mints a token per matching DSN (region taken from the endpoint)
+before `setup.sh` deletes the old userlist, and appends it to `userlist.txt`. Tokens are minted by
+`iam-tokens.py`, one Python process that uses the AWS CLI's bundled botocore and resolves
+credentials once, so startup memory stays flat as DSNs are added (one `aws` process per DSN cost
+~85 MiB RSS each). Prefixed lines from the static userlist are dropped so they cannot shadow a fresh
 token. A prefixed user pointing at a non-RDS host gets no token and a warning.
 
 When IAM DSNs are present, `PGBOUNCER_SERVER_TLS_SSLMODE` values weaker than `require` are
