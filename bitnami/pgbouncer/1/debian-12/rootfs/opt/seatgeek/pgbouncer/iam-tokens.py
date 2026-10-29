@@ -37,16 +37,16 @@ def main():
                 DBHostname=host, Port=int(port), DBUsername=user, Region=region
             )
         except Exception as e:  # any failure must leave no half-written userlist
-            print(f"failed to generate an IAM token for {target}: {e}", file=sys.stderr)
+            print(f"Failed to generate an IAM token for {target}: {e}", file=sys.stderr)
             failed = True
             continue
 
         if not token:
-            print(f"generated an empty IAM token for {target}", file=sys.stderr)
+            print(f"Generated an empty IAM token for {target}", file=sys.stderr)
             failed = True
             continue
 
-        print(f"minted IAM token for {target} ({len(token)} bytes)", file=sys.stderr)
+        print(f"Minted IAM token for {target} ({len(token)} bytes)", file=sys.stderr)
         print(f'"{user}" "{token}"')
 
     return 1 if failed else 0
