@@ -30,7 +30,11 @@ trust` line in the HBA file).
 Images are published as `<version>-r<IMAGE_REVISION>-sg<SEATGEEK_REVISION>`, e.g.
 `1.26.0-r0-sg0`. `IMAGE_REVISION` in the Dockerfile tracks upstream Bitnami releases;
 `SEATGEEK_REVISION` (next to the Dockerfile) tracks our changes. Bump `SEATGEEK_REVISION` with
-every SeatGeek change and never reset it, so each tag always maps to one image.
+every SeatGeek change so each tag always maps to one image.
+
+When the upstream PgBouncer version changes (e.g. `1.26.0` to `1.26.1`), reset
+`SEATGEEK_REVISION` to `0`. Do not reset it for a Bitnami `IMAGE_REVISION` bump alone, since
+the `-r<N>` part already makes that tag unique.
 
 ## Environment variables
 
