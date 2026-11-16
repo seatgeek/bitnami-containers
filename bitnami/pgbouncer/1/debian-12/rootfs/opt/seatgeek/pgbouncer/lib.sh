@@ -112,12 +112,37 @@ reload_pgbouncer() {
     --dbname=pgbouncer --username="${POSTGRESQL_USERNAME}" -c 'RELOAD'
 }
 
+# PGBOUNCER_STATS_USERNAME is a read-only console user kept apart from
+# POSTGRESQL_USERNAME, which Bitnami makes the admin user and which clients often log in
+# as. Giving it a value unique to the instance (e.g. the Kubernetes pod UID) lets a
+# metrics scraper that reaches the wrong PgBouncer, such as another pod that was handed
+# the same IP, fail to log in instead of reporting that instance's pools. Prints its
+# userlist entry; the password defaults to POSTGRESQL_PASSWORD and must not be empty.
+pgbouncer_stats_user_line() {
+  local user="${PGBOUNCER_STATS_USERNAME}"
+  local password="${PGBOUNCER_STATS_PASSWORD:-${POSTGRESQL_PASSWORD:-}}"
+
+  if [ -z "$password" ]; then
+    echo "PGBOUNCER_STATS_USERNAME is set but neither PGBOUNCER_STATS_PASSWORD nor POSTGRESQL_PASSWORD is" >&2
+    return 1
+  fi
+  case "$user" in
+    *[[:space:],]*)
+      echo "PGBOUNCER_STATS_USERNAME must not contain whitespace or commas" >&2
+      return 1
+      ;;
+  esac
+
+  # auth_file quotes each field and escapes " by doubling it
+  printf '"%s" "%s"\n' "${user//\"/\"\"}" "${password//\"/\"\"}"
+}
+
 # Rebuilds the PgBouncer config from the current inputs. Static credentials come from
 # PGBOUNCER_USERLIST_FILE, which setup.sh writes into userlist.txt. IAM tokens cannot
 # go there: they are short-lived and must be minted on each refresh, so they are
 # appended to userlist.txt after setup.sh runs.
 apply_pgbouncer_config() {
-  local targets iam_lines=""
+  local targets iam_lines="" stats_line=""
 
   pgbouncer_source_env_file
 
@@ -146,7 +171,24 @@ apply_pgbouncer_config() {
     iam_lines=$("${PGBOUNCER_SUPERVISOR_DIR}/iam-tokens.py" <<<"$targets") || return 1
   fi
 
+  if [ -n "${PGBOUNCER_STATS_USERNAME:-}" ]; then
+    stats_line=$(pgbouncer_stats_user_line) || return 1
+    case ",${PGBOUNCER_STATS_USERS:-}," in
+      *",${PGBOUNCER_STATS_USERNAME},"*) ;;
+      *) export PGBOUNCER_STATS_USERS="${PGBOUNCER_STATS_USERS:+${PGBOUNCER_STATS_USERS},}${PGBOUNCER_STATS_USERNAME}" ;;
+    esac
+  fi
+
   /opt/bitnami/scripts/pgbouncer/setup.sh
+
+  if [ -n "$stats_line" ]; then
+    # PgBouncer uses the first matching auth_file entry; drop any other entry for the
+    # stats user so its configured password is the one that counts.
+    awk -v entry="${stats_line%% *}" '$1 != entry' "${PGBOUNCER_AUTH_FILE:?}" >"${PGBOUNCER_AUTH_FILE}.tmp"
+    cat "${PGBOUNCER_AUTH_FILE}.tmp" >"${PGBOUNCER_AUTH_FILE}"
+    rm -f "${PGBOUNCER_AUTH_FILE}.tmp"
+    printf '%s\n' "$stats_line" >>"${PGBOUNCER_AUTH_FILE}"
+  fi
 
   if [ -n "$iam_lines" ]; then
     # PgBouncer uses the first matching auth_file entry; drop any prefixed lines the

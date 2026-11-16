@@ -47,9 +47,30 @@ All Bitnami variables still apply. The supervisor adds:
 | `PGBOUNCER_IAM_REFRESH_SECONDS` | `600`                                                     | Interval of the scheduled IAM rebuild; skipped (exit 0, no rebuild/`RELOAD`) when no DSN uses IAM   |
 | `PGBOUNCER_IAM_USER_PREFIX`     | `iam-user-`                                               | DSN users with this prefix get an RDS IAM token instead of a static password                        |
 | `PGBOUNCER_WAIT_FOR_BACKEND`    | `yes`                                                     | Set to `no` to skip Bitnami's wait for `POSTGRESQL_HOST`, e.g. when that host is PgBouncer itself   |
+| `PGBOUNCER_STATS_USERNAME`      |                                                           | Extra read-only console user, added to `stats_users` and `userlist.txt` on every build (see below)  |
+| `PGBOUNCER_STATS_PASSWORD`      | `POSTGRESQL_PASSWORD`                                     | Password for `PGBOUNCER_STATS_USERNAME`; the build fails if both are empty                         |
 
 `PGBOUNCER_USERLIST_FILE` is re-read on every rebuild, so rotating static credentials in that
 file takes effect without a restart.
+
+## Stats user
+
+`POSTGRESQL_USERNAME` is the admin user Bitnami writes into `admin_users`, and clients often log
+in as it over `trust`, so it has to stay the same on every instance. `PGBOUNCER_STATS_USERNAME`
+adds a separate user that may only run `SHOW` commands, with its own entry in `userlist.txt`, so
+it can be unique per instance. A metrics scraper that logs in as the Kubernetes pod UID then fails
+to authenticate if it reaches another pod's PgBouncer (for example one that was handed the IP of a
+pod that has gone away), instead of reporting that pod's pools under the wrong tags.
+
+```yaml
+- name: PGBOUNCER_STATS_USERNAME
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.uid
+```
+
+The entry is re-added after `setup.sh` on every build, replacing any entry for the same user in
+`PGBOUNCER_USERLIST_FILE`. The username must not contain whitespace or commas.
 
 ## RDS IAM authentication
 
